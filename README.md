@@ -1,13 +1,36 @@
 # TARDIS — Time-Travel Debugger for AI Agents
 
-**Deterministic flight recorder, replay engine, and root-cause autopsy for computer-use agents.**
+![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue)
+![License MIT](https://img.shields.io/badge/license-MIT-green)
+
+**The flight recorder that lets you rewind agent failures.**
+
+![TARDIS Architecture](assets/arch.png)
+
+Every computer-use agent fails at step 147 of 150. When it does, you get a screen recording and a guess. TARDIS gives you deterministic replay, causal graphs, and automatic autopsy.
+
+> `npm ERR! EBUSY` once is a bug. Twice is a dataset you should have captured.
+
+### The 20 second demo
 
 ```bash
-pip install tardis-agent-debug
-tardis wrap  # one-line wrap of OpenAI / Anthropic client
-# run your agent — every LLM call, tool invocation, and screen frame is captured
-tardis replay <trace> --from 20   # rewind to step 20, replay forward
-tardis autopsy <trace>            # what broke? why?
+git clone https://github.com/welshe/TARDIS
+cd TARDIS
+pip install -e ".[dev]"
+
+# Wrap your agent - zero code change for OpenAI / Anthropic
+tardis init
+
+# Run your agent normally
+python examples/basic_agent.py
+
+# It failed at step 23? Rewind to step 20 and see exactly what the model saw
+tardis replay <trace_id> --from 20
+
+# What actually broke?
+tardis autopsy <trace_id>
+
+# Output: ROOT CAUSE: grounding_failure - clicked [842, 410] but true button was at [842, 460] - window moved between frames
 ```
 
 ---
@@ -40,8 +63,8 @@ Computer-use agents fail — often at step 147 of 150. Standard observability lo
 ## Install
 
 ```bash
-git clone <repo>
-cd tardis
+git clone https://github.com/welshe/TARDIS
+cd TARDIS
 pip install -e ".[dev]"
 tardis health
 ```
