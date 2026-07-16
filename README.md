@@ -5,8 +5,6 @@
 
 **The flight recorder that lets you rewind agent failures.**
 
-![TARDIS Architecture](assets/arch.png)
-
 Every computer-use agent fails at step 147 of 150. When it does, you get a screen recording and a guess. TARDIS gives you deterministic replay, causal graphs, and automatic autopsy.
 
 > `npm ERR! EBUSY` once is a bug. Twice is a dataset you should have captured.
