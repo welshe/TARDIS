@@ -17,7 +17,6 @@ Every computer-use agent fails at step 147 of 150. When it does, you get a scree
 git clone https://github.com/welshe/TARDIS
 cd TARDIS
 pip install -e ".[dev]"
-tardis init
 
 # Wrap your agent - zero code change for OpenAI / Anthropic
 tardis init
