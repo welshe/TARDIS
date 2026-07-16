@@ -1,0 +1,30 @@
+[project]
+name = "tardis-agent-debug"
+version = "0.1.0"
+description = "TARDIS - Time-Travel Debugger for AI Agents. Deterministic flight recorder, rewind, and autopsy for computer-use agents."
+readme = "README.md"
+requires-python = ">=3.10"
+license = {text = "MIT"}
+authors = [{name = "welshe"}]
+dependencies = [
+    "pydantic>=2.5",
+    "click>=8.1",
+    "rich>=13.0",
+    "mss>=9.0",
+    "Pillow>=10.0",
+    "lancedb>=0.6",
+    "openai>=1.0",
+]
+
+[project.optional-dependencies]
+dev = ["pytest", "ruff"]
+
+[project.scripts]
+tardis = "tardis.cli:main"
+
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
