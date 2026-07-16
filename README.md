@@ -3,6 +3,15 @@
 ![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue)
 ![License MIT](https://img.shields.io/badge/license-MIT-green)
 
+## Contents
+- [20 second demo](#the-20-second-demo)
+- [Why TARDIS](#why-tardis)
+- [How It Works](#how-it-works)
+- [Install](#install)
+- [Quickstart](#quickstart)
+- [CLI Reference](#cli-reference)
+- [Core Concepts](#core-concepts)
+
 **The flight recorder that lets you rewind agent failures.**
 
 Every computer-use agent fails at step 147 of 150. When it does, you get a screen recording and a guess. TARDIS gives you deterministic replay, causal graphs, and automatic autopsy.
