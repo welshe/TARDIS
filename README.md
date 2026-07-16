@@ -104,7 +104,7 @@ Install extras: `pip install -e ".[dom]"` or `pip install -e ".[all]"`
 ---
 
 ## Quickstart
-
+All snapshots are content-hashed and PII-redacted by default (password inputs -> ***). Enable full capture with `capture_dom(redact=False)`.
 ```python
 import tardis
 from openai import OpenAI
