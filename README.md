@@ -14,7 +14,10 @@ Every computer-use agent fails at step 147 of 150. When it does, you get a scree
 ### The 20 second demo
 
 ```bash
-pip install tardis-agent-debug
+git clone https://github.com/welshe/TARDIS
+cd TARDIS
+pip install -e ".[dev]"
+tardis init
 
 # Wrap your agent - zero code change for OpenAI / Anthropic
 tardis init
