@@ -1,6 +1,5 @@
 import click
 from rich import print as rprint
-from .capture.recorder import init
 from .store.sqlite_store import Store
 from .replay.engine import ReplayEngine
 from .causal.graph import CausalGraph
@@ -18,26 +17,32 @@ def health():
     rprint(f"DB: {store.db_path} exists={store.db_path.exists()}")
 
 @main.command()
-def init_cmd():
-    init()
-
-main.add_command(init, name="init")
+def init():
+    """Initialize .tardis/ directory"""
+    from pathlib import Path
+    Path(".tardis").mkdir(exist_ok=True)
+    print("Initialized .tardis/")
 
 @main.command()
-@click.argument("trace_id", required=False)
-def list(trace_id):
+def list():
     store = Store()
     traces = store.list_traces()
     if not traces:
         rprint("[yellow]No traces found. Run your agent with tardis.wrap()[/yellow]")
         return
+    rprint(f"[bold]Total traces: {len(traces)}[/bold]")
     for t in traces:
         steps = len(t.get("steps", []))
-        rprint(f"{t['id']}  steps={steps}  created={t.get('created_at')}")
+        success = t.get("success", True)
+        status = "[green]✓[/green]" if success else "[red]✗[/red]"
+        cost = t.get("total_cost_usd", 0.0)
+        tokens = t.get("total_tokens", 0)
+        rprint(f"{status} {t['id']}  steps={steps}  cost=${cost:.4f}  tokens={tokens}  created={t.get('created_at')}")
 
 @main.command()
 @click.argument("trace_id")
-def show(trace_id):
+@click.option("--export-dot", default=None, help="Export causal graph as DOT file")
+def show(trace_id, export_dot):
     store = Store()
     trace = store.get_trace(trace_id)
     if not trace:
@@ -45,6 +50,8 @@ def show(trace_id):
         return
     g = CausalGraph(trace)
     g.render()
+    if export_dot:
+        g.export_dot(export_dot)
 
 @main.command()
 @click.argument("trace_id")
@@ -88,6 +95,13 @@ def export(trace_id, fmt):
         rprint(f"[green]Wrote {trace.id}.negative.json for RL[/green]")
     else:
         rprint(trace.model_dump_json(indent=2))
+
+@main.command()
+@click.argument("trace_id")
+def analyze(trace_id):
+    """Run pattern analysis on a trace"""
+    engine = ReplayEngine(trace_id)
+    engine.analyze_patterns()
 
 if __name__ == "__main__":
     main()

@@ -1,54 +1,277 @@
-from ..models import Trace, StepType
+from ..models import Trace, StepType, FailureType
+from collections import Counter
+import re
+
+_NUMERIC_PATTERNS = re.compile(r"(?<!\w)(401|403|407|429|500|502|503)(?!\w)")
 
 class Autopsy:
     def __init__(self, trace: Trace):
         self.trace = trace
+        self.confidence = 0.0
+        self.evidence = []
 
     def classify(self):
+        """Classify the failure type with confidence scoring"""
         if not self.trace.steps:
-            return "empty_trace"
-        last = self.trace.steps[-1]
-        # heuristic rules - v0.1, will be ML in v0.2
+            return FailureType.unknown, "empty_trace", 0.0
+        
+        # Run all classification checks
+        checks = [
+            self._check_grounding_failure,
+            self._check_tool_failure_loop,
+            self._check_reasoning_failure,
+            self._check_environment_drift,
+            self._check_memory_failure,
+            self._check_api_errors,
+            self._check_timeout_issues,
+            self._check_resource_exhaustion
+        ]
+        
+        results = []
+        for check in checks:
+            result = check()
+            if result:
+                results.append(result)
+        
+        # Sort by confidence and return the highest
+        if results:
+            results.sort(key=lambda x: x[2], reverse=True)
+            failure_type, details, confidence = results[0]
+            self.confidence = confidence
+            self.trace.failure_type = failure_type
+            return failure_type, details, confidence
+        
+        return FailureType.unknown, f"Last step: {self.trace.steps[-1].type} with output {str(self.trace.steps[-1].output)[:500]}", 0.3
+
+    def _check_grounding_failure(self):
+        """Check for grounding failures (UI element location issues)"""
         text = str(self.trace.steps).lower()
+        patterns = [
+            "elementnotfound", "click failed", "no such element",
+            "element not interactable", "element not clickable",
+            "element obscured", "element not visible",
+            "timeout waiting for element", "stale element"
+        ]
+        
+        matches = [p for p in patterns if p in text]
+        if matches:
+            confidence = min(0.9, 0.5 + len(matches) * 0.1)
+            details = f"Agent tried to interact with UI element that moved or did not exist. Patterns found: {matches}"
+            self.evidence.append(("grounding_patterns", matches))
+            return FailureType.grounding_failure, details, confidence
+        return None
 
-        # check for grounding patterns
-        if "elementnotfound" in text or "click failed" in text or "no such element" in text:
-            return "grounding_failure", "Agent tried to click element that moved or did not exist. Screen diff between step N-2 and N shows layout shift."
-
-        # check for tool failure loops
-        errors = [s for s in self.trace.steps if s.type == StepType.error]
+    def _check_tool_failure_loop(self):
+        """Check for repeated tool failures"""
+        errors = [s for s in self.trace.steps if s.type == StepType.error or not s.success]
         if len(errors) >= 2:
-            # same hash twice?
-            if len(set(e.hash for e in errors)) < len(errors):
-                return "tool_failure_loop", f"Same error repeated {len(errors)} times. Agent did not learn from failure. Hashes: {[e.hash for e in errors]}"
+            # Check for repeated error hashes
+            error_hashes = [e.hash for e in errors if e.hash]
+            if len(set(error_hashes)) < len(error_hashes):
+                duplicates = len(error_hashes) - len(set(error_hashes))
+                confidence = min(0.95, 0.6 + duplicates * 0.1)
+                details = f"Same error repeated {duplicates} times. Agent did not learn from failure. Error hashes: {error_hashes}"
+                self.evidence.append(("repeated_errors", error_hashes))
+                return FailureType.tool_failure, details, confidence
+        return None
 
-        # check for auth / rate limit
-        if "401" in text or "403" in text or "rate limit" in text:
-            return "environment_drift", "API auth or rate limit changed mid-trajectory."
-
-        # check for reasoning loop
+    def _check_reasoning_failure(self):
+        """Check for LLM reasoning loops"""
         llm_calls = [s for s in self.trace.steps if s.type == StepType.llm_call]
         if len(llm_calls) > 3:
-            hashes = [s.hash for s in llm_calls[-3:]]
+            # Check for repeated completion hashes
+            hashes = [s.hash for s in llm_calls[-5:]]
             if len(set(hashes)) == 1:
-                return "reasoning_failure", "LLM stuck in loop, same completion 3 times."
+                confidence = 0.9
+                details = f"LLM stuck in reasoning loop, same completion {len(hashes)} times consecutively."
+                self.evidence.append(("reasoning_loop", hashes))
+                return FailureType.reasoning_failure, details, confidence
+            
+            # Check for similar patterns (not exact matches)
+            if len(set(hashes)) <= 2:
+                confidence = 0.7
+                details = f"LLM showing repetitive behavior patterns. Only {len(set(hashes))} unique patterns in last {len(hashes)} calls."
+                self.evidence.append(("repetitive_patterns", hashes))
+                return FailureType.reasoning_failure, details, confidence
+        return None
 
-        return "unknown", f"Last step: {last.type} with output {str(last.output)[:500]}"
+    def _check_environment_drift(self):
+        """Check for environment changes (auth, rate limits, etc.)"""
+        text = str(self.trace.steps).lower()
+        patterns = [
+            "authentication", "unauthorized",
+            "rate limit", "too many requests",
+            "connection refused", "network unreachable",
+            "dns error", "timeout", "service unavailable"
+        ]
+        
+        matches = [p for p in patterns if p in text]
+        numeric_matches = _NUMERIC_PATTERNS.findall(text)
+        if numeric_matches:
+            matches.extend(numeric_matches)
+        if matches:
+            confidence = min(0.85, 0.6 + len(matches) * 0.05)
+            details = f"Environment changed mid-trajectory. Issues detected: {matches}"
+            self.evidence.append(("environment_issues", matches))
+            return FailureType.environment_drift, details, confidence
+        return None
+
+    def _check_memory_failure(self):
+        """Check for memory/context failures"""
+        text = str(self.trace.steps).lower()
+        patterns = [
+            "context length exceeded", "maximum context length",
+            "token limit", "too many tokens",
+            "context window", "conversation too long"
+        ]
+        
+        matches = [p for p in patterns if p in text]
+        if matches:
+            confidence = 0.8
+            details = f"Agent exceeded context/memory limits. Issues: {matches}"
+            self.evidence.append(("memory_issues", matches))
+            return FailureType.memory_failure, details, confidence
+        
+        # Check if agent forgets previous information
+        llm_calls = [s for s in self.trace.steps if s.type == StepType.llm_call]
+        if len(llm_calls) > 10:
+            # Heuristic: if later calls don't reference earlier context
+            confidence = 0.5
+            details = "Potential memory failure: long conversation with possible context loss"
+            self.evidence.append(("long_conversation", len(llm_calls)))
+            return FailureType.memory_failure, details, confidence
+        return None
+
+    def _check_api_errors(self):
+        """Check for API-specific errors"""
+        text = str(self.trace.steps).lower()
+        patterns = [
+            "internal server error",
+            "api error", "service error", "upstream error"
+        ]
+        
+        matches = [p for p in patterns if p in text]
+        if matches:
+            confidence = 0.75
+            details = f"API service errors detected: {matches}"
+            self.evidence.append(("api_errors", matches))
+            return FailureType.environment_drift, details, confidence
+        return None
+
+    def _check_timeout_issues(self):
+        """Check for timeout-related failures"""
+        text = str(self.trace.steps).lower()
+        patterns = [
+            "timeout", "timed out", "deadline exceeded",
+            "operation timed out", "request timeout"
+        ]
+        
+        matches = [p for p in patterns if p in text]
+        if matches:
+            confidence = 0.7
+            details = f"Timeout issues detected: {matches}"
+            self.evidence.append(("timeout_issues", matches))
+            return FailureType.tool_failure, details, confidence
+        return None
+
+    def _check_resource_exhaustion(self):
+        """Check for resource exhaustion issues"""
+        text = str(self.trace.steps).lower()
+        patterns = [
+            "out of memory", "disk full", "no space left",
+            "resource exhausted", "quota exceeded",
+            "memory limit", "cpu limit"
+        ]
+        
+        matches = [p for p in patterns if p in text]
+        if matches:
+            confidence = 0.8
+            details = f"Resource exhaustion detected: {matches}"
+            self.evidence.append(("resource_issues", matches))
+            return FailureType.environment_drift, details, confidence
+        return None
+
+    def generate_fix_suggestions(self, failure_type):
+        """Generate specific fix suggestions based on failure type"""
+        suggestions = {
+            FailureType.grounding_failure: [
+                "Add active-window rect validation before UI interactions",
+                "Implement retry logic with element re-location",
+                "Use screen diff to detect layout shifts before interaction",
+                "Add visual verification before click operations",
+                "Use tardis export --format negative-pair to fine-tune grounding model"
+            ],
+            FailureType.tool_failure: [
+                "Implement exponential backoff for tool failures",
+                "Add tool-specific error handling and recovery",
+                "Cache successful tool results to avoid repeated failures",
+                "Add LanceDB lookup for known failure patterns before retry",
+                "Implement circuit breaker pattern for failing tools"
+            ],
+            FailureType.reasoning_failure: [
+                "Add thought validator that checks for repeated hashes",
+                "Implement diversity checks in LLM responses",
+                "Add few-shot examples to break repetitive patterns",
+                "Increase temperature to reduce deterministic loops",
+                "Add explicit step-by-step reasoning requirements"
+            ],
+            FailureType.memory_failure: [
+                "Implement context summarization for long conversations",
+                "Add selective context retention based on importance",
+                "Use external memory (vector DB) for long-term information",
+                "Implement conversation pruning strategies",
+                "Add context window monitoring and warnings"
+            ],
+            FailureType.environment_drift: [
+                "Add health checks before operations",
+                "Implement retry logic with exponential backoff",
+                "Add circuit breaker for external dependencies",
+                "Monitor and alert on environment changes",
+                "Add graceful degradation for service unavailability"
+            ]
+        }
+        return suggestions.get(failure_type, ["Run tardis replay --from <failure-2> to inspect context"])
 
     def report(self):
-        kind, details = self.classify()
+        """Generate comprehensive autopsy report"""
+        failure_type, details, confidence = self.classify()
+        
         print(f"\n[ AUTOPSY REPORT ] Trace {self.trace.id}")
-        print(f"Root cause: {kind}")
+        print(f"=" * 50)
+        print(f"Failure Type: {failure_type.value}")
+        print(f"Confidence: {confidence:.1%}")
         print(f"Details: {details}")
-        print("\nSuggested fix:")
-        if kind == "grounding_failure":
-            print(" - Add active-window rect validation before click")
-            print(" - Use tardis export --format negative-pair to fine-tune grounding model")
-        elif kind == "tool_failure_loop":
-            print(" - Inject skill: if EBUSY, kill process before retry")
-            print(" - Add LanceDB lookup before generic fix")
-        elif kind == "reasoning_failure":
-            print(" - Add thought validator that checks for repeated hashes")
-        else:
-            print(" - Run tardis replay --from <failure-2> to inspect context")
-        return kind, details
+        
+        # Show trace statistics
+        print(f"\n[ TRACE STATISTICS ]")
+        print(f"Total steps: {len(self.trace.steps)}")
+        print(f"Duration: {self.trace.get_duration_seconds():.2f}s")
+        print(f"Total cost: ${self.trace.total_cost_usd:.4f}")
+        print(f"Total tokens: {self.trace.total_tokens}")
+        print(f"Success: {self.trace.success}")
+        
+        # Show step breakdown
+        print(f"\n[ STEP BREAKDOWN ]")
+        step_types = Counter(s.type.value for s in self.trace.steps)
+        for step_type, count in step_types.most_common():
+            print(f"  {step_type}: {count}")
+        
+        # Show evidence
+        if self.evidence:
+            print(f"\n[ EVIDENCE ]")
+            for evidence_type, evidence_data in self.evidence:
+                print(f"  {evidence_type}: {evidence_data}")
+        
+        # Show fix suggestions
+        print(f"\n[ SUGGESTED FIXES ]")
+        suggestions = self.generate_fix_suggestions(failure_type)
+        for i, suggestion in enumerate(suggestions, 1):
+            print(f"  {i}. {suggestion}")
+        
+        # Show next steps
+        print(f"\n[ NEXT STEPS ]")
+        print(f"  1. Run: tardis replay {self.trace.id} --from {max(0, len(self.trace.steps)-5)}")
+        print(f"  2. Examine the causal graph: tardis show {self.trace.id}")
+        print(f"  3. If needed, export for training: tardis export {self.trace.id} --format negative-pair")
+        
+        return failure_type, details, confidence

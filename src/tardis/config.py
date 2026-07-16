@@ -1,4 +1,8 @@
-import tomllib, pathlib
+import pathlib
+try:
+    import tomllib
+except ImportError:
+    import tomli as tomllib  # Python 3.10 compat
 from pydantic import BaseModel
 
 class Config(BaseModel):

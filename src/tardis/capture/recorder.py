@@ -37,6 +37,15 @@ class Recorder:
             metadata=metadata or {},
         )
         step.hash = stable_hash({"in": input, "out": output})
+        # Extract enhanced metadata
+        if metadata:
+            if 'token_count' in metadata:
+                step.token_count = metadata['token_count']
+            if 'cost_usd' in metadata:
+                step.cost_usd = metadata['cost_usd']
+            if 'model' in metadata:
+                step.model_name = metadata['model']
+        step.success = type != StepType.error
         self.trace.add_step(step)
         self.store.save_step(step)
         self.store.save_trace(self.trace)
