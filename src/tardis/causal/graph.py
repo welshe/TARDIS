@@ -60,6 +60,14 @@ class CausalGraph:
                 # Screen frames can inform grounding
                 if last_llm is not None:
                     edges.append((last_llm, s.index, "llm_uses_screen", 0.5))
+
+            elif s.type in (StepType.dom_snapshot, StepType.accessibility_snapshot):
+                # Snapshots inform subsequent LLM grounding
+                if last_llm is not None:
+                    edges.append((last_llm, s.index, "llm_uses_snapshot", 0.6))
+                # Snapshots are caused by preceding tool calls
+                if last_tool is not None:
+                    edges.append((last_tool, s.index, "tool_triggers_snapshot", 0.7))
         
         # Add temporal edges (sequential causality)
         for i in range(len(self.trace.steps) - 1):
@@ -188,6 +196,10 @@ class CausalGraph:
                 color = "lightgreen"
             elif node_data["type"] == "tool_call":
                 color = "lightyellow"
+            elif node_data["type"] == "dom_snapshot":
+                color = "lightskyblue"
+            elif node_data["type"] == "accessibility_snapshot":
+                color = "thistle"
             
             label = f"{idx}\\n{node_data['type']}"
             dot_lines.append(f'  {idx} [label="{label}", fillcolor="{color}", style="filled"];')

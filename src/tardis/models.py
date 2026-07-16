@@ -9,6 +9,8 @@ class StepType(str, Enum):
     tool_call = "tool_call"
     tool_result = "tool_result"
     screen_frame = "screen_frame"
+    dom_snapshot = "dom_snapshot"
+    accessibility_snapshot = "accessibility_snapshot"
     user_action = "user_action"
     thought = "thought"
     error = "error"

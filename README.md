@@ -3,9 +3,18 @@
 ![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue)
 ![License MIT](https://img.shields.io/badge/license-MIT-green)
 
-**The flight recorder that lets you rewind agent failures.**
+## Contents
+- [20 second demo](#the-20-second-demo)
+- [Why TARDIS](#why-tardis)
+- [How It Works](#how-it-works)
+- [Install](#install)
+- [Quickstart](#quickstart)
+- [CLI Reference](#cli-reference)
+- [Core Concepts](#core-concepts)
+- [Project Structure](#project-structure)
+- [Roadmap](#roadmap)
 
-![TARDIS Architecture](assets/arch.png)
+**The flight recorder that lets you rewind agent failures.**
 
 Every computer-use agent fails at step 147 of 150. When it does, you get a screen recording and a guess. TARDIS gives you deterministic replay, causal graphs, and automatic autopsy.
 
@@ -42,6 +51,7 @@ Computer-use agents fail — often at step 147 of 150. Standard observability lo
 - Every LLM prompt, completion, token count, and cost
 - Every tool call, result, and error with duration
 - Every screen frame, pixel diff, and layout shift
+- Every DOM and accessibility tree snapshot for grounding analysis
 - Content-addressed hashing for byte-for-byte deterministic replay
 - Automatic failure classification with evidence and fix suggestions
 
@@ -53,9 +63,9 @@ Computer-use agents fail — often at step 147 of 150. Standard observability lo
 
 **Capture** → **Store** → **Replay** → **Autopsy**
 
-1. **Capture** — Proxy wrappers intercept OpenAI and Anthropic calls, tool invocations, and screen frames via Win32 hooks with zero code changes to your agent logic.
+1. **Capture** — Proxy wrappers intercept OpenAI and Anthropic calls, tool invocations, screen frames via Win32 hooks, DOM/accessibility tree snapshots — all with zero code changes to your agent logic.
 2. **Store** — Every step is recorded in an append-only SQLite store with content-addressed hashing. Traces are immutable and time-indexed.
-3. **Replay** — Deterministic engine rewinds to any step, injects edited tool outputs to explore what-if scenarios, and replays forward with breakpoint support.
+3. **Replay** — Deterministic engine rewinds to any step, injects edited tool outputs to explore what-if scenarios, and replays forward with breakpoint support and cross-trace diff.
 4. **Autopsy** — A multi-pattern classifier scores confidence across 8 failure detection methods, collects supporting evidence, and generates specific fix suggestions.
 
 ---
@@ -80,6 +90,16 @@ tardis health
 | `Pillow>=10.0` | Image diff, hashing, analysis |
 | `openai>=1.0` | OpenAI API proxy |
 | `lancedb>=0.6` | Vector store for failure patterns |
+
+### Optional Backends
+
+| Dependency | Extras | Purpose |
+|---|---|---|
+| `playwright>=1.40` | `dom` | Browser DOM snapshot capture |
+| `websockets>=12.0` | `cdp` | Chrome DevTools Protocol DOM capture (lighter alternative) |
+| `uiautomation>=2.0` | `accessibility` | Windows UI Automation accessibility tree capture |
+
+Install extras: `pip install -e ".[dom]"` or `pip install -e ".[all]"`
 
 ---
 
@@ -108,6 +128,21 @@ For Anthropic:
 ```python
 from anthropic import Anthropic
 client = tardis.wrap_anthropic(Anthropic())
+```
+
+For DOM/accessibility snapshots:
+
+```python
+from tardis.capture.dom_snapshot import capture_dom, capture_accessibility, diff_snapshots
+
+dom = capture_dom(url="https://example.com")
+rec.log_dom_snapshot(dom)
+
+acc = capture_accessibility()
+rec.log_accessibility_snapshot(acc)
+
+# Detect layout shifts between snapshots
+diff = diff_snapshots(snapshot_before, snapshot_after)
 ```
 
 ---
@@ -142,6 +177,8 @@ A `Trace` is an ordered sequence of `Step` objects. Each step captures a single 
 | `tool_call` | Tool invocation with input/output |
 | `tool_result` | Tool execution result |
 | `screen_frame` | Screen capture at a point in time |
+| `dom_snapshot` | Browser DOM tree snapshot |
+| `accessibility_snapshot` | Windows UI Automation accessibility tree |
 | `user_action` | User intervention |
 | `thought` | Agent internal reasoning |
 | `error` | Captured exception with context |
@@ -155,7 +192,7 @@ The autopsy classifier checks 8 failure modes and returns the highest-confidence
 | Failure Type | Detection Method |
 |---|---|
 | `reasoning_failure` | Hash repetition detection, pattern similarity |
-| `grounding_failure` | UI element interaction errors, screen diff analysis |
+| `grounding_failure` | UI element interaction errors, screen diff, snapshot layout shift |
 | `tool_failure` | Repeated error hash chains, timeout detection |
 | `memory_failure` | Context-length exceeded, long conversation heuristics |
 | `environment_drift` | Auth errors, rate limits, network failures, resource exhaustion |
@@ -169,16 +206,19 @@ Edges encode semantic relationships between steps:
 - `llm_calls_tool` — LLM decisions trigger tool invocations
 - `causes_error` / `error_propagation` — failure chains
 - `context_chain` — sequential LLM context windows
+- `llm_uses_screen` — screen frame used for visual grounding
+- `llm_uses_snapshot` — DOM/accessibility snapshot used for grounding
+- `tool_triggers_snapshot` — tool call triggers a snapshot capture
 - `temporal` — sequential ordering (baseline)
 
-The graph supports critical-path analysis (trace failure chains backward), loop detection (DFS-based cycle finding), and DOT export for GraphViz visualization.
+The graph supports critical-path analysis (trace failure chains backward), loop detection (DFS-based cycle finding), DOT export for GraphViz visualization, and influence mapping.
 
 ### Replay Engine
 
 - Rewind to any step index with `--from` / `--to`
 - Inject edited tool outputs to test hypothetical fixes
 - Breakpoints with interactive inspect (`i`), continue, quit
-- Pattern analysis across LLM calls, error types, and tool usage
+- Pattern analysis across LLM calls, error types, tool usage, and snapshots
 - Cross-trace diff to find divergences between runs
 
 ---
@@ -198,6 +238,7 @@ src/tardis/
     anthropic_proxy.py # Anthropic client wrapper with token/cost tracking
     tool_wrapper.py    # Decorator for instrumenting tool calls
     screen.py          # Screen capture (mss), pixel diff, layout shift detection
+    dom_snapshot.py    # DOM & accessibility tree snapshots, tree diff for grounding
 
   store/
     sqlite_store.py    # Append-only SQLite with prefix ID matching
@@ -206,7 +247,7 @@ src/tardis/
     engine.py          # Deterministic replay with breakpoints, inspect, diff, analysis
 
   causal/
-    graph.py           # Multi-relationship causal graph with critical path & loop detection
+    graph.py           # Multi-relationship causal graph with critical path, loops, DOT
 
   autopsy/
     classifier.py      # 8-method failure classifier with confidence scoring & evidence
@@ -221,20 +262,22 @@ examples/
   tool_tracing_example.py      # Tool call tracing with error handling
   replay_example.py            # Replay + causal graph demonstration
   advanced_analysis_example.py # Full analysis workflow (patterns, graph, autopsy)
+  dom_snapshot_example.py      # DOM/accessibility snapshot capture and diff
 
 tests/
   test_models.py               # Model validation, aggregation, error tracking
   test_causal_graph.py         # Graph construction, critical path, loops, DOT export
   test_autopsy.py              # Classifier accuracy, evidence, fix suggestions, reports
+  test_dom_snapshot.py         # Snapshot capture, tree diff, layout shift detection
 ```
 
 ---
 
 ## Roadmap
 
-- **v0.1** — OpenAI + Anthropic wrappers, SQLite store, deterministic replay, heuristic autopsy, screen diff, causal graph analysis *(current)*
-- **v0.2** — DOM/accessibility snapshots, advanced grounding analysis, ML-assisted classification
-- **v0.3** — Cross-platform window management, distributed trace aggregation
+- **v0.1** — OpenAI + Anthropic wrappers, SQLite store, deterministic replay, heuristic autopsy, screen diff, causal graph analysis
+- **v0.2** — DOM/accessibility snapshots, tree diff for grounding analysis, cross-platform window management *(current)*
+- **v0.3** — ML-assisted classification, distributed trace aggregation
 - **v1.0** — eBPF integration, multi-agent orchestration, real-time monitoring dashboards
 
 ---

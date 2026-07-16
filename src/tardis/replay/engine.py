@@ -55,6 +55,8 @@ class ReplayEngine:
                 self._replay_tool_call(s, out, replay_state)
             elif s.type == StepType.error:
                 self._replay_error(s, replay_state)
+            elif s.type in (StepType.dom_snapshot, StepType.accessibility_snapshot):
+                self._replay_snapshot(s, replay_state)
             else:
                 self._replay_generic(s, out, replay_state)
         
@@ -89,6 +91,17 @@ class ReplayEngine:
     def _replay_error(self, step, state):
         print(f"      ERROR: {step.output.get('error', 'Unknown error')}")
         state["context"]["last_error"] = step.output
+
+    def _replay_snapshot(self, step, state):
+        snap_type = "DOM" if step.type == StepType.dom_snapshot else "Accessibility"
+        method = step.metadata.get("method", "?")
+        url = step.input.get("url", step.input.get("desktop_name", ""))
+        elements = step.output.get("elements", {})
+        count = _count_nodes(elements)
+        print(f"      Type: {snap_type} ({method})")
+        print(f"      Target: {url or 'active window'}")
+        print(f"      Elements captured: {count}")
+        state["context"]["last_snapshot"] = step.output
 
     def _replay_generic(self, step, output, state):
         print(f"      Input: {str(step.input)[:300]}")
@@ -169,3 +182,25 @@ class ReplayEngine:
             print(f"  Tool calls: {len(tool_calls)}")
             for name, count in sorted(tool_names.items(), key=lambda x: x[1], reverse=True):
                 print(f"    {name}: {count}")
+
+        # Analyze DOM/accessibility snapshots
+        dom_snapshots = self.trace.get_steps_by_type(StepType.dom_snapshot)
+        acc_snapshots = self.trace.get_steps_by_type(StepType.accessibility_snapshot)
+        if dom_snapshots or acc_snapshots:
+            print(f"  DOM snapshots: {len(dom_snapshots)}")
+            print(f"  Accessibility snapshots: {len(acc_snapshots)}")
+            total_nodes = sum(
+                _count_nodes(s.output.get("elements", {})) for s in dom_snapshots + acc_snapshots
+            )
+            print(f"  Total nodes captured: {total_nodes}")
+
+
+def _count_nodes(element) -> int:
+    """Count total nodes in a nested element tree."""
+    if not element:
+        return 0
+    count = 1
+    for child in element.get("children") or []:
+        if isinstance(child, dict):
+            count += _count_nodes(child)
+    return count

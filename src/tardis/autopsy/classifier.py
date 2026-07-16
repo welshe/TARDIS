@@ -46,6 +46,27 @@ class Autopsy:
     def _check_grounding_failure(self):
         """Check for grounding failures (UI element location issues)"""
         text = str(self.trace.steps).lower()
+
+        # Check for snapshot-related grounding evidence
+        dom_steps = [s for s in self.trace.steps if s.type == StepType.dom_snapshot]
+        acc_steps = [s for s in self.trace.steps if s.type == StepType.accessibility_snapshot]
+
+        if len(dom_steps) >= 2 or len(acc_steps) >= 2:
+            # Compare consecutive snapshots for layout shifts
+            from ..capture.dom_snapshot import diff_snapshots
+
+            snapshots = dom_steps or acc_steps
+            for i in range(len(snapshots) - 1):
+                diff = diff_snapshots(snapshots[i].output, snapshots[i + 1].output)
+                if diff.get("layout_shift"):
+                    self.evidence.append(("snapshot_layout_shift", diff))
+                    return FailureType.grounding_failure, (
+                        f"Layout shift detected between snapshots: "
+                        f"{diff['modified_count']} elements moved, "
+                        f"{diff['added_count']} added, {diff['removed_count']} removed"
+                    ), 0.85
+
+
         patterns = [
             "elementnotfound", "click failed", "no such element",
             "element not interactable", "element not clickable",

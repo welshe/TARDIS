@@ -1,4 +1,5 @@
 import threading
+from typing import Optional
 from ..models import Trace, Step, StepType
 from ..store.sqlite_store import Store
 from ..utils.hashing import stable_hash
@@ -50,6 +51,24 @@ class Recorder:
         self.store.save_step(step)
         self.store.save_trace(self.trace)
         return step
+
+    def log_dom_snapshot(self, snapshot: dict, url: Optional[str] = None):
+        """Log a DOM snapshot step."""
+        return self.log(
+            StepType.dom_snapshot,
+            input={"url": url or snapshot.get("url")},
+            output=snapshot,
+            metadata={"method": snapshot.get("method"), "schema": snapshot.get("schema")},
+        )
+
+    def log_accessibility_snapshot(self, snapshot: dict):
+        """Log an accessibility snapshot step."""
+        return self.log(
+            StepType.accessibility_snapshot,
+            input={"desktop_name": snapshot.get("desktop_name")},
+            output=snapshot,
+            metadata={"method": snapshot.get("method"), "schema": snapshot.get("schema")},
+        )
 
 def record():
     return Recorder().start()
