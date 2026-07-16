@@ -1,0 +1,3 @@
+.tardis/
+*.db
+*.negative.json
