@@ -12,6 +12,8 @@ class StepType(str, Enum):
     dom_snapshot = "dom_snapshot"
     accessibility_snapshot = "accessibility_snapshot"
     user_action = "user_action"
+    raw_input = "raw_input"
+    orchestration_event = "orchestration_event"
     thought = "thought"
     error = "error"
 

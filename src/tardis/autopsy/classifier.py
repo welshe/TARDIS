@@ -1,4 +1,5 @@
 from ..models import Trace, StepType, FailureType
+from ..store.lancedb_store import FailurePatternStore
 from collections import Counter
 import re
 
@@ -289,10 +290,25 @@ class Autopsy:
         for i, suggestion in enumerate(suggestions, 1):
             print(f"  {i}. {suggestion}")
         
+        # Search for similar failures in LanceDB
+        store = FailurePatternStore()
+        similar = store.search_similar(self.trace, limit=3)
+        if similar:
+            print(f"\n[ SIMILAR PAST FAILURES (LanceDB) ]")
+            for i, s in enumerate(similar, 1):
+                dist = s.get("_distance", 1.0)
+                sim_pct = max(0, int((1.0 - dist) * 100)) if dist <= 1.0 else 0
+                print(f"  {i}. [{s['failure_type']}] {s['description'][:120]} (similarity: {sim_pct}%, trace: {s['trace_id']})")
+            print(f"  Run 'tardis similar {self.trace.id}' for full search results.")
+
+        # Index this failure for future searches
+        store.index_trace(self.trace)
+
         # Show next steps
         print(f"\n[ NEXT STEPS ]")
         print(f"  1. Run: tardis replay {self.trace.id} --from {max(0, len(self.trace.steps)-5)}")
         print(f"  2. Examine the causal graph: tardis show {self.trace.id}")
-        print(f"  3. If needed, export for training: tardis export {self.trace.id} --format negative-pair")
-        
+        print(f"  3. Search for similar patterns: tardis similar {self.trace.id}")
+        print(f"  4. If needed, export for training: tardis export {self.trace.id} --format negative-pair")
+
         return failure_type, details, confidence

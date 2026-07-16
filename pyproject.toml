@@ -1,6 +1,6 @@
 [project]
 name = "tardis-agent-debug"
-version = "0.2.0"
+version = "0.3.0"
 description = "TARDIS - Time-Travel Debugger for AI Agents. Deterministic flight recorder, rewind, and autopsy for computer-use agents."
 readme = "README.md"
 requires-python = ">=3.10"
