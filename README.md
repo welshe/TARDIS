@@ -52,6 +52,8 @@ tardis autopsy <trace_id>
 
 **The differentiator.** Most open-source computer-use agent frameworks log API calls. TARDIS captures every keyboard press and mouse movement at the OS level, before any application sees them. This gives you **ground-truth input logging** — you know exactly what keys the agent pressed and exactly where the mouse clicked, regardless of which application received the event.
 
+Security note: Hooks capture keystrokes at OS level. Disabled by default, opt-in only via Win32HookManager(). Never enable in production with real user passwords. All key events are hashed and can be redacted.
+
 ```python
 import tardis
 from tardis.capture.win32_hooks import Win32HookManager, hook_keyboard_and_mouse
