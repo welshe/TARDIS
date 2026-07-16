@@ -1,6 +1,0 @@
-.tardis/
-__pycache__/
-*.db
-*.negative.json
-dist/
-.venv/
