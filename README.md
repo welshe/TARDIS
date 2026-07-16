@@ -7,7 +7,7 @@
 ## Contents
 - [20 second demo](#the-20-second-demo)
 - [Why TARDIS](#why-tardis)
-- [Win32 Hooks](#win32-hooks) ⚡ *differentiator*
+- [Win32 Hooks](#win32-hooks)
 - [Multi-Agent Orchestration](#multi-agent-orchestration)
 - [LanceDB Failure Pattern Store](#lancedb-failure-pattern-store)
 - [How It Works](#how-it-works)
