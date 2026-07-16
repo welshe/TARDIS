@@ -1,5 +1,8 @@
 # TARDIS - Time-Travel Debugger for AI Agents
 
+![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue)
+![License MIT](https://img.shields.io/badge/license-MIT-green)
+
 **The flight recorder that lets you rewind agent failures.**
 
 Every computer-use agent fails at step 147 of 150. When it does, you get a screen recording and a guess. TARDIS gives you deterministic replay, causal graphs, and automatic autopsy.
