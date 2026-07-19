@@ -59,8 +59,17 @@ MOUSE_EVENT_NAMES = {
     WM_MOUSEHWHEEL: "wheel_horizontal",
 }
 
-KERNEL32 = ctypes.windll.kernel32
-USER32 = ctypes.windll.user32
+# Windows-specific constants - initialized lazily to avoid import errors on non-Windows
+KERNEL32 = None
+USER32 = None
+
+def _init_win32():
+    """Initialize Windows DLLs. Only call on Windows."""
+    global KERNEL32, USER32
+    if KERNEL32 is None:
+        KERNEL32 = ctypes.windll.kernel32
+        USER32 = ctypes.windll.user32
+    return KERNEL32, USER32
 
 HINSTANCE = ctypes.wintypes.HINSTANCE
 LPARAM = ctypes.wintypes.LPARAM
@@ -106,8 +115,9 @@ def _vk_to_name(vk_code: int) -> str:
 
 def _vk_to_char(vk_code: int, shift: bool = False) -> Optional[str]:
     buf = ctypes.create_unicode_buffer(16)
-    sc = ctypes.windll.user32.MapVirtualKeyW(vk_code, 0)
-    result = ctypes.windll.user32.ToUnicode(vk_code, sc, None, buf, 16, 0)
+    _, user32 = _init_win32()
+    sc = user32.MapVirtualKeyW(vk_code, 0)
+    result = user32.ToUnicode(vk_code, sc, None, buf, 16, 0)
     if result > 0:
         return buf.value
     return None
@@ -149,6 +159,7 @@ class Win32HookManager:
         self._lock = threading.Lock()
         self._keyboard_proc = HOOKPROC(self._low_level_keyboard_proc)
         self._mouse_proc = HOOKPROC(self._low_level_mouse_proc)
+        self._hook_thread_id: Optional[int] = None  # Store hook thread ID for WM_QUIT
 
     def start(self) -> "Win32HookManager":
         if self._running.is_set():
@@ -162,13 +173,16 @@ class Win32HookManager:
         if not self._running.is_set():
             return
         self._running.clear()
+        k32, u32 = _init_win32()
         if self._keyboard_hook:
-            USER32.UnhookWindowsHookEx(self._keyboard_hook)
+            u32.UnhookWindowsHookEx(self._keyboard_hook)
             self._keyboard_hook = None
         if self._mouse_hook:
-            USER32.UnhookWindowsHookEx(self._mouse_hook)
+            u32.UnhookWindowsHookEx(self._mouse_hook)
             self._mouse_hook = None
-        USER32.PostThreadMessageW(KERNEL32.GetCurrentThreadId(), 0x0012, 0, 0)  # WM_QUIT
+        # Post WM_QUIT to the hook thread's message queue (not the calling thread)
+        if self._hook_thread_id is not None:
+            u32.PostThreadMessageW(self._hook_thread_id, 0x0012, 0, 0)  # WM_QUIT
 
     def get_events(self, clear: bool = False) -> list[dict]:
         with self._lock:
@@ -192,15 +206,17 @@ class Win32HookManager:
                 pass
 
     def _message_loop(self):
-        thread_id = KERNEL32.GetCurrentThreadId()
+        k32, u32 = _init_win32()
+        # Store the hook thread ID for proper WM_QUIT posting in stop()
+        self._hook_thread_id = k32.GetCurrentThreadId()
 
-        self._keyboard_hook = USER32.SetWindowsHookExW(
+        self._keyboard_hook = u32.SetWindowsHookExW(
             WH_KEYBOARD_LL,
             self._keyboard_proc,
             HINSTANCE(0),
             0,
         )
-        self._mouse_hook = USER32.SetWindowsHookExW(
+        self._mouse_hook = u32.SetWindowsHookExW(
             WH_MOUSE_LL,
             self._mouse_proc,
             HINSTANCE(0),
@@ -208,24 +224,24 @@ class Win32HookManager:
         )
 
         if not self._keyboard_hook:
-            raise OSError(f"SetWindowsHookEx(WH_KEYBOARD_LL) failed: {KERNEL32.GetLastError()}")
+            raise OSError(f"SetWindowsHookEx(WH_KEYBOARD_LL) failed: {k32.GetLastError()}")
         if not self._mouse_hook:
-            raise OSError(f"SetWindowsHookEx(WH_MOUSE_LL) failed: {KERNEL32.GetLastError()}")
+            raise OSError(f"SetWindowsHookEx(WH_MOUSE_LL) failed: {k32.GetLastError()}")
 
         msg = MSG()
         p_msg = ctypes.pointer(msg)
 
         while self._running.is_set():
-            ret = USER32.GetMessageW(p_msg, None, 0, 0)
+            ret = u32.GetMessageW(p_msg, None, 0, 0)
             if ret in (0, -1):
                 break
-            USER32.TranslateMessage(p_msg)
-            USER32.DispatchMessageW(p_msg)
+            u32.TranslateMessage(p_msg)
+            u32.DispatchMessageW(p_msg)
 
         if self._keyboard_hook:
-            USER32.UnhookWindowsHookEx(self._keyboard_hook)
+            u32.UnhookWindowsHookEx(self._keyboard_hook)
         if self._mouse_hook:
-            USER32.UnhookWindowsHookEx(self._mouse_hook)
+            u32.UnhookWindowsHookEx(self._mouse_hook)
 
     def _low_level_keyboard_proc(self, nCode: int, wParam: WPARAM, lParam: LPARAM) -> LRESULT:
         if nCode >= 0:
@@ -238,7 +254,8 @@ class Win32HookManager:
             event_type = "key_down" if wParam in (WM_KEYDOWN, WM_SYSKEYDOWN) else "key_up"
             vk_name = _vk_to_name(kb.vkCode)
 
-            shift_state = USER32.GetAsyncKeyState(0x10) & 0x8000
+            _, user32 = _init_win32()
+            shift_state = user32.GetAsyncKeyState(0x10) & 0x8000
             char_val = None
             if wParam in (WM_KEYDOWN, WM_SYSKEYDOWN):
                 char_val = _vk_to_char(kb.vkCode, bool(shift_state))
@@ -256,7 +273,8 @@ class Win32HookManager:
             }
             self._dispatch(event)
 
-        return USER32.CallNextHookEx(0, nCode, wParam, lParam)
+        _, user32 = _init_win32()
+        return user32.CallNextHookEx(0, nCode, wParam, lParam)
 
     def _low_level_mouse_proc(self, nCode: int, wParam: WPARAM, lParam: LPARAM) -> LRESULT:
         if nCode >= 0:
@@ -278,7 +296,8 @@ class Win32HookManager:
 
             self._dispatch(event)
 
-        return USER32.CallNextHookEx(0, nCode, wParam, lParam)
+        _, user32 = _init_win32()
+        return user32.CallNextHookEx(0, nCode, wParam, lParam)
 
 
 def hook_keyboard_and_mouse(

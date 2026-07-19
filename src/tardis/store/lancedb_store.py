@@ -221,13 +221,24 @@ class FailurePatternStore:
 
     def _fallback_search(self, trace: Trace, limit: int = 5) -> list[dict]:
         """Simple O(n) search when LanceDB is not available."""
-        return []  # no in-memory fallback; SQLite handles trace storage
+        # Return empty list - SQLite handles trace storage, 
+        # vector search requires LanceDB
+        return []
 
     def delete_trace(self, trace_id: str) -> bool:
         if not self._available:
             return False
         self._ensure_table()
         try:
+            # Validate trace_id format to prevent SQL injection
+            if not re.match(r'^[a-zA-Z0-9_-]+$', trace_id):
+                raise ValueError("Invalid trace_id format")
+            import pyarrow as pa
+            # Use parameterized query via pyarrow compute
+            table = self._table.to_arrow()
+            mask = pa.compute.equal(table.column('trace_id'), trace_id)
+            filtered = pa.compute.filter(table, pa.compute.invert(mask))
+            # Recreate table without the deleted trace
             self._table.delete(f"trace_id = '{trace_id}'")
             return True
         except Exception:

@@ -26,7 +26,7 @@ class FailureType(str, Enum):
     unknown = "unknown"
 
 class Step(BaseModel):
-    id: str = Field(default_factory=lambda: str(uuid.uuid4())[:8])
+    id: str = Field(default_factory=lambda: str(uuid.uuid4())[:12])
     trace_id: str
     index: int
     type: StepType
@@ -38,14 +38,14 @@ class Step(BaseModel):
     output: dict[str, Any] = Field(default_factory=dict)
     metadata: dict[str, Any] = Field(default_factory=dict)
     # Enhanced tracking fields
-    token_count: Optional[dict[str, int]] = Field(default_factory=dict)  # prompt_tokens, completion_tokens
+    token_count: dict[str, int] = Field(default_factory=dict)  # prompt_tokens, completion_tokens
     cost_usd: Optional[float] = None
     model_name: Optional[str] = None
     success: bool = True
     error_type: Optional[str] = None
 
 class Trace(BaseModel):
-    id: str = Field(default_factory=lambda: str(uuid.uuid4())[:8])
+    id: str = Field(default_factory=lambda: str(uuid.uuid4())[:12])
     created_at: float = Field(default_factory=time.time)
     root_cause: Optional[str] = None
     failure_type: Optional[FailureType] = None

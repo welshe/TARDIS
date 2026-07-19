@@ -1,10 +1,76 @@
+```
+# Python compiled files
 __pycache__/
-*.py[cod]
-*$py.class
-*.egg-info/
-*.egg
+*.pyc
+*.pyo
+*.pyd
+
+# Database and storage
 .tardis/
+
+# Package distribution
+*.egg-info/
+
+# Logs and temporary files
+*.log
+*.tmp
+
+# Environment files
+.env
+.env.local
+*.env.*
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS generated files
+.DS_Store
+Thumbs.db
+
+# Coverage reports
+coverage/
+htmlcov/
+*.coverage
+
+# Build artifacts
 dist/
 build/
-*.db
-*.negative.json
+target/
+*.so
+*.dylib
+*.dll
+*.exe
+*.out
+
+# Virtual environments
+venv/
+.venv/
+env/
+ENV/
+
+# Dependency caches
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnp/
+.pnp.js
+
+# Testing
+.pytest_cache/
+.mypy_cache/
+
+# Compression artifacts
+*.zip
+*.gz
+*.tar
+*.tgz
+*.bz2
+*.xz
+*.7z
+*.rar
+*.zst
+```

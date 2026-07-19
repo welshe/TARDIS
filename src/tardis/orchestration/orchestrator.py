@@ -74,12 +74,15 @@ class Orchestrator:
 
     def _find_agent(self, task: Task) -> Optional[Agent]:
         required = {AgentCapability(c) for c in task.required_capabilities}
+        # First try to find an idle agent with required capabilities
         for agent in self.agents.values():
             if agent.state == AgentState.idle and required.issubset(agent.capabilities):
                 return agent
+        # Fallback: assign to any idle agent (may lack capabilities - caller should handle)
         for agent in self.agents.values():
             if agent.state == AgentState.idle:
                 return agent
+        # Last resort: try waiting agents with required capabilities
         for agent in self.agents.values():
             if agent.state == AgentState.waiting and required.issubset(agent.capabilities):
                 return agent
@@ -125,12 +128,17 @@ class Orchestrator:
             agent.error_message = str(e)
             raise
 
-    def run_parallel(self, fn_map: dict[str, Callable] = None) -> list[Task]:
+    def run_parallel(self, fn_map: dict[str, Callable] = None, strict_capabilities: bool = False) -> list[Task]:
         """
         Run all pending tasks in parallel using the thread pool.
 
         fn_map maps capability strings to agent functions.
         Tasks are routed to idle agents based on capability matching.
+        
+        Args:
+            fn_map: Dictionary mapping agent names or task descriptions to callables
+            strict_capabilities: If True, tasks without capable agents will fail immediately
+                               instead of falling back to any available agent
         """
         fn_map = fn_map or {}
         self._executor = ThreadPoolExecutor(max_workers=self.max_workers)
@@ -143,7 +151,36 @@ class Orchestrator:
         tasks_to_run.sort(key=lambda t: t.priority.value if isinstance(t.priority, TaskPriority) else t.priority, reverse=True)
 
         for task in tasks_to_run:
-            agent = self._find_agent(task)
+            required = {AgentCapability(c) for c in task.required_capabilities}
+            agent = None
+            
+            # Find agent with required capabilities
+            for a in self.agents.values():
+                if a.state == AgentState.idle and required.issubset(a.capabilities):
+                    agent = a
+                    break
+            
+            # If no capable agent found and strict mode enabled, fail the task
+            if agent is None and strict_capabilities:
+                task.mark_failed("No agent with required capabilities")
+                with self._lock:
+                    self._failed.append(task)
+                self._log_event("task_failed", {"task_id": task.id, "reason": "no_capable_agent_strict_mode"})
+                continue
+            
+            # Fallback: find any idle agent (non-strict mode)
+            if agent is None:
+                for a in self.agents.values():
+                    if a.state == AgentState.idle:
+                        agent = a
+                        self._log_event("capability_mismatch", {
+                            "task_id": task.id,
+                            "required": list(required),
+                            "assigned_agent": a.id,
+                            "agent_capabilities": list(a.capabilities)
+                        })
+                        break
+            
             if agent is None:
                 with self._lock:
                     self._pending.append(task)

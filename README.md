@@ -2,7 +2,7 @@
 
 ![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue)
 ![License MIT](https://img.shields.io/badge/license-MIT-green)
-![Version](https://img.shields.io/badge/version-0.3.0-purple)
+![Version](https://img.shields.io/badge/version-0.4.0-purple)
 
 ## Contents
 - [20 second demo](#the-20-second-demo)
@@ -430,9 +430,9 @@ tests/
 
 - **v0.1** — OpenAI + Anthropic wrappers, SQLite store, deterministic replay, heuristic autopsy, screen diff, causal graph analysis
 - **v0.2** — DOM/accessibility snapshots, tree diff for grounding analysis, cross-platform window management
-- **v0.3** — Win32 low-level keyboard/mouse hooks, multi-agent orchestration with capability routing and shared memory, LanceDB vector store for failure pattern similarity search *(current)*
-- **v0.4** — ML-assisted classification, distributed trace aggregation, cross-platform input hooks (macOS/Linux)
-- **v1.0** — eBPF integration, real-time monitoring dashboards, fleet management
+- **v0.3** — Win32 low-level keyboard/mouse hooks, multi-agent orchestration with capability routing and shared memory, LanceDB vector store for failure pattern similarity search
+- **v0.4** — Thread-safe recorder with batch persistence, improved UUID entropy (12 hex chars), structured error field access in classifier, priority-based failure classification, Win32 hook thread cleanup fix, SQL injection prevention, strict capability mode for orchestrator, structured report output, PEP 8 naming *(current)*
+- **v1.0** — ML-assisted classification, distributed trace aggregation, cross-platform input hooks (macOS/Linux), eBPF integration, real-time monitoring dashboards, fleet management
 
 ---
 
