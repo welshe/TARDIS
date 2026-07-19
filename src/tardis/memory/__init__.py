@@ -498,3 +498,7 @@ def create_shared_memory(agent_id: Optional[str] = None) -> SharedMemory:
 def enable_knowledge_sharing(agent_id: str) -> SharedMemory:
     """Enable knowledge sharing for an agent."""
     return create_shared_memory(agent_id)
+
+
+# Alias for consistency
+KnowledgeGraphMemory = SharedMemory

@@ -1,0 +1,2 @@
+[console_scripts]
+tardis = tardis.cli:main
