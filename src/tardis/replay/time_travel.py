@@ -452,3 +452,7 @@ def create_replay_engine(trace_id: Optional[str] = None) -> TimeTravelReplay:
     if trace_id:
         engine.load_trace(trace_id)
     return engine
+
+
+# Alias for consistency
+TimeTravelReplayer = TimeTravelReplay

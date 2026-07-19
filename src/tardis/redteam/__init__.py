@@ -337,3 +337,7 @@ def enable_adversarial_defense(alert_callback: Optional[Callable] = None) -> Adv
     defense = AdversarialDefense()
     defense.alert_callback = alert_callback
     return defense
+
+
+# Alias for consistency
+RedTeamEngine = RedTeamAgent
