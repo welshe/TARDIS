@@ -12,8 +12,10 @@ def get_current_recorder():
     return getattr(_current, "recorder", None)
 
 class Recorder:
-    def __init__(self):
+    def __init__(self, session_name: str = ""):
         self.trace = Trace()
+        if session_name:
+            self.trace.metadata["session_name"] = session_name
         self.store = Store()
         self.active = False
         self._lock = threading.Lock()

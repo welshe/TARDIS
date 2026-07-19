@@ -2,7 +2,7 @@
 
 ![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue)
 ![License MIT](https://img.shields.io/badge/license-MIT-green)
-![Version](https://img.shields.io/badge/version-0.4.0-purple)
+![Version](https://img.shields.io/badge/version-0.5.0-purple)
 
 ## Contents
 - [20 second demo](#the-20-second-demo)
@@ -10,6 +10,10 @@
 - [Win32 Hooks](#win32-hooks)
 - [Multi-Agent Orchestration](#multi-agent-orchestration)
 - [LanceDB Failure Pattern Store](#lancedb-failure-pattern-store)
+- [Real-Time Anomaly Detection](#real-time-anomaly-detection)
+- [Async Support](#async-support)
+- [Plugin System](#plugin-system)
+- [Feedback Loop for Fine-Tuning](#feedback-loop-for-fine-tuning)
 - [How It Works](#how-it-works)
 - [Install](#install)
 - [Quickstart](#quickstart)
@@ -173,6 +177,189 @@ tardis vector-stats                    # show indexed pattern count
 ```
 
 > **Note:** LanceDB and PyArrow are required for vector search. Install with `pip install lancedb pyarrow`. Without them, TARDIS works fully except for similarity search — the autopsy still classifies failures, just without historical pattern matching.
+
+---
+
+## Real-Time Anomaly Detection
+
+**Prevent failures before they cascade.** TARDIS v0.5 introduces statistical anomaly detection that monitors your agent in real-time, detecting token spikes, latency anomalies, error streaks, tool failure clusters, infinite loops, and context overflow risks — all using rolling windows and z-score analysis.
+
+```python
+import tardis
+from tardis.monitoring import LiveMonitor, MonitorConfig
+
+# Configure monitoring with custom thresholds
+config = MonitorConfig(
+    refresh_interval=1.0,
+    anomaly_threshold=0.7,
+    enable_alerts=True,
+    alert_callback=lambda a: print(f"ALERT: {a.description}"),
+)
+
+monitor = LiveMonitor(config).start()
+rec = tardis.Recorder().start()
+
+# Your agent runs - monitor processes each step
+# When anomalies are detected, you get instant alerts
+
+# Get live dashboard data
+dashboard = monitor.get_dashboard_data()
+print(f"Active traces: {dashboard['status']['active_traces']}")
+print(f"Anomalies detected: {dashboard['anomalies']['total']}")
+
+# Generate summary report
+print(monitor.get_summary_report())
+```
+
+**Detectable Anomaly Types:**
+- `token_spike` — Sudden increase in token usage (z-score > 2.5)
+- `latency_spike` — API response time anomalies
+- `error_rate_surge` — Consecutive error detection (3+ errors)
+- `tool_failure_cluster` — Repeated tool failures
+- `loop_detected` — LLM response hash repetition (infinite loop)
+- `context_overflow_risk` — Approaching context window limit (>80%)
+- `cost_anomaly` — Unexpected cost increases
+- `grounding_drift` — Significant layout shifts (>30%)
+
+**Features:**
+- Rolling window statistics with configurable size
+- Z-score based anomaly detection
+- Thread-safe processing
+- Callback-based alerting system
+- File logging for audit trails
+- Real-time metrics dashboard data
+
+---
+
+## Async Support
+
+**Built for modern async agents.** TARDIS v0.5 introduces `AsyncRecorder` — a fully async-compatible recorder designed for agents using Playwright, aiohttp, asyncio, and other async frameworks. All I/O operations are offloaded to a background thread to avoid blocking the event loop.
+
+```python
+import tardis
+import asyncio
+
+async def run_agent():
+    # Option 1: Direct usage
+    rec = tardis.AsyncRecorder().start()
+    
+    response = await client.chat.completions.create(...)
+    await tool.call(...)
+    
+    trace = await rec.stop()
+    
+    # Option 2: Context manager (recommended)
+    async with tardis.async_record("my_session") as rec:
+        response = await client.chat.completions.create(...)
+        await tool.call(...)
+    # Trace automatically stopped and saved
+
+asyncio.run(run_agent())
+```
+
+**Features:**
+- Same API as synchronous `Recorder`
+- Non-blocking I/O via background thread pool
+- Async context manager support (`async with`)
+- Full compatibility with asyncio event loops
+- Ideal for Playwright, aiohttp, asyncpg, and other async libraries
+
+---
+
+## Plugin System
+
+**Extend failure detection with custom plugins.** The built-in 8-method classifier is powerful, but every team has domain-specific failure modes. TARDIS v0.5 introduces a plugin registry that lets you register custom failure checks that integrate seamlessly with the autopsy system.
+
+```python
+import tardis
+from tardis.autopsy.plugins import register_check, CheckResult
+
+@register_check("api_rate_limit", priority=2)
+def check_rate_limit(trace, steps):
+    """Detect API rate limiting patterns."""
+    for step in steps:
+        if hasattr(step, 'output'):
+            output = step.output or {}
+            if "rate limit" in str(output.get("error", "")).lower():
+                return CheckResult(
+                    check_name="api_rate_limit",
+                    matched=True,
+                    confidence=0.9,
+                    evidence=["Rate limit error detected in API response"],
+                    fix_suggestion="Implement exponential backoff or request rate limit increase",
+                    priority=2,
+                )
+    return CheckResult("api_rate_limit", False, 0.0, [])
+
+# Your plugin is now automatically included in autopsy reports!
+result = tardis.FailureClassifier().classify(trace)
+```
+
+**Features:**
+- Simple decorator-based registration
+- Priority-based execution (1=highest, 10=lowest)
+- Thread-safe registry
+- Graceful error handling (plugins never crash the classifier)
+- Full integration with existing autopsy reports
+- Runtime check discovery and listing
+
+---
+
+## Feedback Loop for Fine-Tuning
+
+**Turn failures into training data.** TARDIS v0.5 automatically converts autopsy results into structured feedback entries that can be exported as fine-tuning datasets for OpenAI, Anthropic, or custom models. Close the loop between debugging and model improvement.
+
+```python
+import tardis
+from tardis.feedback import FeedbackLoop
+
+# Initialize feedback system
+feedback = FeedbackLoop(storage_dir=".tardis/feedback")
+
+# After running autopsy on a failed trace
+autopsy_result = tardis.FailureClassifier().classify(trace)
+trace_steps = trace.steps
+
+# Create feedback entry from autopsy
+entry = feedback.add_from_autopsy(
+    trace_id=trace.id,
+    autopsy_result=autopsy_result,
+    trace_steps=trace_steps,
+)
+
+# Export as OpenAI fine-tuning dataset
+feedback.export_fine_tuning_dataset(
+    output_path="training_data.jsonl",
+    model_format="openai",
+)
+
+# Export as contrastive pairs for RLHF
+feedback.export_training_data(
+    output_path="negative_pairs.jsonl",
+    format="negative-pair",
+)
+
+# Get statistics
+stats = feedback.get_statistics()
+print(f"Total entries: {stats['total_entries']}")
+print(f"By failure type: {stats['by_failure_type']}")
+```
+
+**Export Formats:**
+- `openai` — Messages format for OpenAI fine-tuning API
+- `anthropic` — System + messages format for Anthropic fine-tuning
+- `raw` — Simple prompt/completion pairs
+- `jsonl` — Contrastive training pairs
+- `json` — Structured JSON array
+- `negative-pair` — RLHF format with chosen/rejected responses
+
+**Features:**
+- Automatic extraction of prompts/responses from traces
+- Integration with autopsy failure classification
+- Multiple export formats for different ML pipelines
+- Persistent storage with JSON serialization
+- Statistics and analytics
+- Per-trace feedback indexing
 
 ---
 
@@ -431,7 +618,8 @@ tests/
 - **v0.1** — OpenAI + Anthropic wrappers, SQLite store, deterministic replay, heuristic autopsy, screen diff, causal graph analysis
 - **v0.2** — DOM/accessibility snapshots, tree diff for grounding analysis, cross-platform window management
 - **v0.3** — Win32 low-level keyboard/mouse hooks, multi-agent orchestration with capability routing and shared memory, LanceDB vector store for failure pattern similarity search
-- **v0.4** — Thread-safe recorder with batch persistence, improved UUID entropy (12 hex chars), structured error field access in classifier, priority-based failure classification, Win32 hook thread cleanup fix, SQL injection prevention, strict capability mode for orchestrator, structured report output, PEP 8 naming *(current)*
+- **v0.4** — Thread-safe recorder with batch persistence, improved UUID entropy (12 hex chars), structured error field access in classifier, priority-based failure classification, Win32 hook thread cleanup fix, SQL injection prevention, strict capability mode for orchestrator, structured report output, PEP 8 naming
+- **v0.5** — Real-time anomaly detection with z-score analysis, async recorder for asyncio/Playwright/aiohttp, plugin system for custom failure checks, feedback loop for fine-tuning data export *(current)*
 - **v1.0** — ML-assisted classification, distributed trace aggregation, cross-platform input hooks (macOS/Linux), eBPF integration, real-time monitoring dashboards, fleet management
 
 ---
