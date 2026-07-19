@@ -2,10 +2,12 @@
 
 ![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue)
 ![License MIT](https://img.shields.io/badge/license-MIT-green)
-![Version](https://img.shields.io/badge/version-0.5.0-purple)
+![Version](https://img.shields.io/badge/version-0.6.0-purple)
 
 ## Contents
 - [20 second demo](#the-20-second-demo)
+- [What's New in v0.6.0](#whats-new-in-v060)
+- [Bug Fixes in v0.6.0](#bug-fixes-in-v060)
 - [Why TARDIS](#why-tardis)
 - [Win32 Hooks](#win32-hooks)
 - [Multi-Agent Orchestration](#multi-agent-orchestration)
@@ -363,6 +365,94 @@ print(f"By failure type: {stats['by_failure_type']}")
 
 ---
 
+## What's New in v0.6.0
+
+### 1. Predictive Failure Prevention (Pre-cog Mode)
+Real-time vector similarity analysis blocks risky actions before they execute. When your agent is about to take an action, Pre-cog Mode compares it against historical failure patterns and intervenes if similarity exceeds a configurable threshold.
+
+```python
+from tardis.prevention import PreCogMode
+
+precog = PreCogMode(threshold=0.85).enable()
+# Agent actions are now screened against known failure patterns
+# High-risk actions trigger automatic intervention
+```
+
+### 2. Autonomous Repair & What-If Simulation
+TARDIS now auto-generates potential fixes and tests them in parallel using shadow execution. Run multiple what-if scenarios simultaneously to validate repairs before applying them to production.
+
+```python
+from tardis.repair import AutonomousRepair
+
+repair = AutonomousRepair(trace_id="<trace_id>")
+fixes = repair.generate_fixes()  # Returns list of candidate fixes
+results = repair.simulate_all(fixes)  # Parallel validation
+best_fix = repair.apply_best(results)
+```
+
+### 3. Deep OS Integration (eBPF/ETW)
+Kernel-level tracing provides zero-overhead monitoring on Linux (eBPF) and Windows (ETW). Capture system calls, network events, and process activity without modifying application code.
+
+```python
+from tardis.tracing import KernelTracer
+
+tracer = KernelTracer(backend="ebpf")  # or "etw" on Windows
+tracer.start()
+# Zero-overhead kernel-level event capture
+events = tracer.stop()
+```
+
+### 4. Collaborative Swarm Debugging
+Five specialized AI agents work in parallel to diagnose failures:
+- **Root Cause Analyst** - Identifies fundamental failure sources
+- **Pattern Matcher** - Finds similar historical failures
+- **Fix Generator** - Proposes candidate solutions
+- **Validator** - Tests fixes in isolation
+- **Reporter** - Generates human-readable reports
+
+```python
+from tardis.swarm import SwarmDebugger
+
+swarm = SwarmDebugger()
+diagnosis = swarm.analyze(trace_id="<trace_id>")
+print(diagnosis.consensus_report())
+```
+
+### 5. Continuous Production Intelligence
+Shadow mode deployment with automated regression testing and RLHF negative pair generation. Monitor production agents without impacting users, automatically collecting training data from near-misses and failures.
+
+```python
+from tardis.production import ShadowMode
+
+shadow = ShadowMode(production_agent=my_agent)
+shadow.deploy()
+# Runs in parallel, comparing decisions with production
+# Auto-generates RLHF negative pairs for fine-tuning
+```
+
+---
+
+## Bug Fixes in v0.6.0
+
+### Critical Bug Fixes
+- **Thread Safety** - Fixed race conditions in concurrent trace recording and hook management
+- **UUID Collision Risk** - Implemented cryptographically secure UUID generation
+- **Classifier Fragility** - Improved failure detection robustness with fallback strategies
+- **Win32 Hook Cleanup** - Proper unhooking and resource cleanup on shutdown
+- **SQL Injection Prevention** - Parameterized queries throughout SQLite operations
+- **Error Handling** - Comprehensive exception handling with graceful degradation
+- **Async Support** - Full asyncio compatibility with non-blocking I/O
+- **Plugin System** - Thread-safe plugin registry with error isolation
+- **Feedback Loop** - Reliable feedback entry creation and export
+- **Security Layer** - Enhanced input sanitization and access controls
+
+### Minor Improvements
+- PEP8 naming convention compliance throughout codebase
+- Fixed parameter shadowing issues in nested functions
+- Updated README with comprehensive v0.6.0 documentation
+
+---
+
 ## Why TARDIS
 
 Computer-use agents fail — often at step 147 of 150. Standard observability logs text. TARDIS logs **causality**:
@@ -619,7 +709,8 @@ tests/
 - **v0.2** — DOM/accessibility snapshots, tree diff for grounding analysis, cross-platform window management
 - **v0.3** — Win32 low-level keyboard/mouse hooks, multi-agent orchestration with capability routing and shared memory, LanceDB vector store for failure pattern similarity search
 - **v0.4** — Thread-safe recorder with batch persistence, improved UUID entropy (12 hex chars), structured error field access in classifier, priority-based failure classification, Win32 hook thread cleanup fix, SQL injection prevention, strict capability mode for orchestrator, structured report output, PEP 8 naming
-- **v0.5** — Real-time anomaly detection with z-score analysis, async recorder for asyncio/Playwright/aiohttp, plugin system for custom failure checks, feedback loop for fine-tuning data export *(current)*
+- **v0.5** — Real-time anomaly detection with z-score analysis, async recorder for asyncio/Playwright/aiohttp, plugin system for custom failure checks, feedback loop for fine-tuning data export
+- **v0.6** — Predictive Failure Prevention (Pre-cog Mode), Autonomous Repair & What-If Simulation, Deep OS Integration (eBPF/ETW), Collaborative Swarm Debugging, Continuous Production Intelligence with shadow mode and RLHF negative pairs *(current)*
 - **v1.0** — ML-assisted classification, distributed trace aggregation, cross-platform input hooks (macOS/Linux), eBPF integration, real-time monitoring dashboards, fleet management
 
 ---
