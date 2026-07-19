@@ -2,11 +2,10 @@
 
 ![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue)
 ![License MIT](https://img.shields.io/badge/license-MIT-green)
-![Version](https://img.shields.io/badge/version-0.7.0-purple)
+![Version](https://img.shields.io/badge/version-0.6.0-purple)
 
 ## Contents
 - [20 second demo](#the-20-second-demo)
-- [What's New in v0.7.0](#whats-new-in-v070)
 - [What's New in v0.6.0](#whats-new-in-v060)
 - [Bug Fixes in v0.6.0](#bug-fixes-in-v060)
 - [Why TARDIS](#why-tardis)
@@ -433,7 +432,7 @@ shadow.deploy()
 
 ---
 
-## What's New in v0.7.0
+## Coming in v0.7.0 (Development Preview)
 
 These features are now implemented and ready for testing:
 
@@ -761,14 +760,13 @@ The graph supports critical-path analysis (trace failure chains backward), loop 
 
 ```
 src/tardis/
-  __init__.py          # Package exports: Recorder, AsyncRecorder, Agent, Orchestrator, Win32HookManager, PreCogMode, AutonomousRepair, SwarmDebugger, ShadowMode, KernelTracer, RedTeamEngine, ComplianceAuditor, KnowledgeGraphMemory, etc.
+  __init__.py          # Package exports: Recorder, Agent, Orchestrator, Win32HookManager, etc.
   models.py            # Pydantic models: Trace, Step, StepType (12 types), FailureType
   config.py            # TOML-based configuration loader
   cli.py               # Click CLI with 11 commands (hook, orch demo, etc.)
 
   capture/
     recorder.py        # Flight recorder: start/stop/log with thread-local context
-    async_recorder.py  # Async-compatible recorder for asyncio/Playwright/aiohttp
     llm_proxy.py       # OpenAI client wrapper with token/cost tracking
     anthropic_proxy.py # Anthropic client wrapper with token/cost tracking
     tool_wrapper.py    # Decorator for instrumenting tool calls
@@ -789,49 +787,12 @@ src/tardis/
 
   replay/
     engine.py          # Deterministic replay with breakpoints, inspect, diff, analysis
-    time_travel.py     # Kernel-level time-travel replay with eBPF/ETW state capture
 
   causal/
     graph.py           # Multi-relationship causal graph with critical path, loops, DOT
 
   autopsy/
     classifier.py      # 8-method failure classifier with confidence scoring & evidence
-    plugins.py         # Plugin registry for custom failure checks
-
-  prevention/
-    __init__.py        # Pre-cog mode: predictive failure prevention with vector similarity
-
-  repair/
-    __init__.py        # Autonomous repair with what-if simulation
-
-  tracing/
-    __init__.py        # KernelTracer: eBPF (Linux) and ETW (Windows) integration
-
-  swarm/
-    __init__.py        # Collaborative swarm debugging with 5 specialized agents
-
-  production/
-    __init__.py        # ShadowMode: continuous production intelligence
-
-  redteam/
-    __init__.py        # Automated red-teaming with 8 attack types and adversarial defense
-
-  routing/
-    __init__.py        # Cost-aware dynamic model routing
-
-  compliance/
-    __init__.py        # Compliance auditor for GDPR, HIPAA, EU AI Act
-
-  memory/
-    __init__.py        # Cross-agent knowledge graph memory
-
-  monitoring/
-    __init__.py        # Real-time anomaly detection
-    live_monitor.py    # Live monitoring dashboard
-
-  feedback/
-    __init__.py        # Feedback loop for fine-tuning data export
-    loop.py            # Fine-tuning dataset generation
 
   utils/
     hashing.py         # Content-addressed SHA-256 hashing
@@ -863,9 +824,8 @@ tests/
 - **v0.3** — Win32 low-level keyboard/mouse hooks, multi-agent orchestration with capability routing and shared memory, LanceDB vector store for failure pattern similarity search
 - **v0.4** — Thread-safe recorder with batch persistence, improved UUID entropy (12 hex chars), structured error field access in classifier, priority-based failure classification, Win32 hook thread cleanup fix, SQL injection prevention, strict capability mode for orchestrator, structured report output, PEP 8 naming
 - **v0.5** — Real-time anomaly detection with z-score analysis, async recorder for asyncio/Playwright/aiohttp, plugin system for custom failure checks, feedback loop for fine-tuning data export
-- **v0.6** — Predictive Failure Prevention (Pre-cog Mode), Autonomous Repair & What-If Simulation, Deep OS Integration (eBPF/ETW), Collaborative Swarm Debugging, Continuous Production Intelligence with shadow mode and RLHF negative pairs
-- **v0.7** — Automated Red-Teaming & Adversarial Defense, Cost-Aware Dynamic Model Routing, Deterministic Time-Travel Replay Engine, Compliance & Governance Auto-Auditor, Cross-Agent Knowledge Graph Memory *(current)*
-
+- **v0.6** — Predictive Failure Prevention (Pre-cog Mode), Autonomous Repair & What-If Simulation, Deep OS Integration (eBPF/ETW), Collaborative Swarm Debugging, Continuous Production Intelligence with shadow mode and RLHF negative pairs *(current)*
+- **v0.7** — Automated Red-Teaming & Adversarial Defense, Cost-Aware Dynamic Model Routing, Deterministic Time-Travel Replay Engine, Compliance & Governance Auto-Auditor, Cross-Agent Knowledge Graph Memory *(in development)*
 - **v1.0** — ML-assisted classification, distributed trace aggregation, cross-platform input hooks (macOS/Linux), eBPF integration, real-time monitoring dashboards, fleet management
 
 ---
