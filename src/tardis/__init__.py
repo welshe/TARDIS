@@ -26,3 +26,10 @@ __all__ = [
     "FeedbackLoop", "FeedbackEntry",
 ]
 __version__ = "0.5.0"
+
+# v0.6.0 Exports
+from .predictive.preventer import PredictiveFailurePrevention, RiskLevel
+from .repair.repair_engine import AutonomousRepairEngine
+from .os_integration.kernel_tracer import KernelTracer
+from .swarm.swarm_debugger import CollaborativeSwarmDebugger
+from .production.shadow_mode import ProductionIntelligence, ShadowModeStatus
